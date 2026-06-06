@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔔 نظام الإشعارات</title>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh}
+
+/* LOGIN */
+#loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.lcard{background:#111827;border:1px solid #1f2d45;border-radius:20px;padding:40px 32px;text-align:center;width:100%;max-width:400px}
+.logo{font-size:56px;margin-bottom:14px}
+.lcard h2{font-size:22px;font-weight:900;background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.lcard p{color:#64748b;font-size:13px;margin-bottom:28px}
+.finput{width:100%;padding:13px 16px;background:#0a0e1a;border:1.5px solid #1f2d45;border-radius:12px;color:#e2e8f0;font-family:'Cairo',sans-serif;font-size:15px;outline:none;margin-bottom:12px;transition:border-color .2s}
+.finput:focus{border-color:#00d4ff}
+.finput::placeholder{color:#334155}
+.lbtn{width:100%;padding:13px;background:linear-gradient(135deg,#00d4ff22,#7c3aed44);border:1.5px solid #7c3aed;border-radius:12px;color:#c4b5fd;font-family:'Cairo',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
+.lbtn:hover{background:linear-gradient(135deg,#00d4ff33,#7c3aed66);color:#fff}
+.lbtn:disabled{opacity:.5;cursor:not-allowed}
+.lerr{color:#ef4444;font-size:12px;margin-top:8px;display:none}
+
+/* APP */
+#app{display:none;max-width:900px;margin:0 auto;padding:20px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid #1f2d45;margin-bottom:22px}
+.userbox{display:flex;align-items:center;gap:12px}
+.av{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0}
+.uname{font-size:15px;font-weight:700}
+.uid{font-size:12px;color:#64748b;margin-top:2px;font-family:monospace}
+.hright{display:flex;gap:10px;align-items:center}
+.wsbadge{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:50px;font-size:12px;font-weight:600;border:1px solid;transition:all .3s}
+.wsbadge.on{border-color:#10b981;color:#10b981;background:rgba(16,185,129,.07)}
+.wsbadge.off{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.07)}
+.wsbadge.wait{border-color:#f59e0b;color:#f59e0b}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.pulse{animation:pu 1.5s infinite}
+@keyframes pu{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.6)}}
+.outbtn{padding:7px 14px;border-radius:50px;border:1px solid #1f2d45;background:transparent;color:#64748b;font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
+.outbtn:hover{border-color:#ef4444;color:#ef4444}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.scard{background:#111827;border:1px solid #1f2d45;border-radius:12px;padding:16px;text-align:center}
+.snum{font-size:30px;font-weight:900;line-height:1}
+.slbl{font-size:11px;color:#64748b;margin-top:4px}
+.c-cyan .snum{color:#00d4ff}
+.c-green .snum{color:#10b981}
+.c-amber .snum{color:#f59e0b}
+.c-red .snum{color:#ef4444}
+
+/* FILTERS */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.fb{padding:7px 15px;border-radius:50px;border:1px solid #1f2d45;background:#111827;color:#64748b;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.fb:hover,.fb.on{border-color:#00d4ff;color:#00d4ff;background:rgba(0,212,255,.06)}
+.fb.mine-btn.on{border-color:#7c3aed;color:#a78bfa;background:rgba(124,58,237,.08)}
+.clrbtn{margin-right:auto;padding:7px 15px;border-radius:50px;border:1px solid #ef444455;background:transparent;color:#ef4444;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer}
+.clrbtn:hover{background:rgba(239,68,68,.08)}
+
+/* CARDS */
+.nlist{display:flex;flex-direction:column;gap:10px}
+.nc{background:#111827;border:1px solid #1f2d45;border-radius:14px;padding:16px 18px;display:flex;gap:13px;position:relative;overflow:hidden;cursor:default;transition:border-color .25s,box-shadow .25s;animation:si .35s cubic-bezier(.34,1.56,.64,1) both}
+.nc::before{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;border-radius:0 4px 4px 0}
+.nc:hover{border-color:rgba(255,255,255,.09)}
+.nc.isnew{border-color:#00d4ff55;box-shadow:0 0 18px rgba(0,212,255,.09)}
+.nc.ismine{border-color:#7c3aed66;box-shadow:0 0 20px rgba(124,58,237,.13)}
+.nc.ismine::before{background:#7c3aed}
+.nc.t-INFO::before{background:#3b82f6}
+.nc.t-SUCCESS::before{background:#10b981}
+.nc.t-WARNING::before{background:#f59e0b}
+.nc.t-ERROR::before{background:#ef4444}
+.nc.t-SYSTEM::before{background:#7c3aed}
+@keyframes si{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
+.nico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ni-INFO{background:rgba(59,130,246,.13)}
+.ni-SUCCESS{background:rgba(16,185,129,.13)}
+.ni-WARNING{background:rgba(245,158,11,.13)}
+.ni-ERROR{background:rgba(239,68,68,.13)}
+.ni-SYSTEM{background:rgba(124,58,237,.13)}
+.nbody{flex:1;min-width:0}
+.nrow1{display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap}
+.ntit{font-size:14px;font-weight:700}
+.pill{font-size:11px;padding:2px 9px;border-radius:50px;font-weight:600}
+.pi-INFO{background:rgba(59,130,246,.18);color:#93c5fd}
+.pi-SUCCESS{background:rgba(16,185,129,.18);color:#6ee7b7}
+.pi-WARNING{background:rgba(245,158,11,.18);color:#fcd34d}
+.pi-ERROR{background:rgba(239,68,68,.18);color:#fca5a5}
+.pi-SYSTEM{background:rgba(124,58,237,.18);color:#c4b5fd}
+.pmine{background:rgba(124,58,237,.12);color:#a78bfa;font-size:10px}
+.nmsg{font-size:13px;color:#64748b;line-height:1.55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nmeta{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.ntime{font-size:11px;color:#475569}
+.nfor{font-size:10px;color:#7c3aed;background:rgba(124,58,237,.1);padding:2px 8px;border-radius:50px}
+.empty{text-align:center;padding:60px 20px;color:#475569}
+.eico{font-size:54px;margin-bottom:12px;opacity:.4}
+
+/* TOAST */
+#toasts{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#1a2332;border:1px solid #2a3a52;border-radius:12px;padding:11px 18px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;box-shadow:0 8px 28px rgba(0,0,0,.5);animation:tin .35s cubic-bezier(.34,1.56,.64,1) both,tout .3s ease forwards 3.7s;pointer-events:all;min-width:260px}
+@keyframes tin{from{opacity:0;transform:translateY(-14px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes tout{to{opacity:0;transform:translateY(-8px)}}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="lcard">
+    <div class="logo">🔔</div>
+    <h2>نظام الإشعارات</h2>
+    <p>سجّل دخولك برقم هويتك لاستقبال إشعاراتك الشخصية</p>
+    <input class="finput" id="inId" placeholder="رقم الهوية (مثال: 2493302976)" maxlength="20" autofocus/>
+    <input class="finput" id="inName" placeholder="اسمك (اختياري)"/>
+    <button class="lbtn" id="lbtn" onclick="login()">دخول ←</button>
+    <div class="lerr" id="lerr">يرجى إدخال رقم الهوية</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="userbox">
+      <div class="av" id="avEl"></div>
+      <div>
+        <div class="uname" id="unameEl"></div>
+        <div class="uid" id="uidEl"></div>
+      </div>
+    </div>
+    <div class="hright">
+      <div class="wsbadge wait" id="wsbadge"><div class="dot" id="wsdot"></div><span id="wstext">جاري الاتصال...</span></div>
+      <button class="outbtn" onclick="logout()">خروج</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="scard c-cyan"><div class="snum" id="stT">0</div><div class="slbl">الإجمالي</div></div>
+    <div class="scard c-green"><div class="snum" id="stS">0</div><div class="slbl">نجاح</div></div>
+    <div class="scard c-amber"><div class="snum" id="stW">0</div><div class="slbl">تحذير</div></div>
+    <div class="scard c-red"><div class="snum" id="stE">0</div><div class="slbl">خطأ</div></div>
+  </div>
+
+  <div class="filters">
+    <button class="fb on" onclick="setF('ALL',this)">الكل</button>
+    <button class="fb" onclick="setF('INFO',this)">🔵 معلومة</button>
+    <button class="fb" onclick="setF('SUCCESS',this)">🟢 نجاح</button>
+    <button class="fb" onclick="setF('WARNING',this)">🟡 تحذير</button>
+    <button class="fb" onclick="setF('ERROR',this)">🔴 خطأ</button>
+    <button class="fb mine-btn" onclick="setF('MINE',this)">👤 لي فقط</button>
+    <button class="clrbtn" onclick="clearAll()">🗑️ مسح</button>
+  </div>
+
+  <div id="nlist" class="nlist">
+    <div class="empty"><div class="eico">📭</div><p>لا توجد إشعارات بعد</p></div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8082';
+const WS_URL = API + '/ws';
+const ICON = {INFO:'ℹ️',SUCCESS:'✅',WARNING:'⚠️',ERROR:'❌',SYSTEM:'⚙️'};
+const LBL  = {INFO:'معلومة',SUCCESS:'نجاح',WARNING:'تحذير',ERROR:'خطأ',SYSTEM:'نظام'};
+const FREQ = {SUCCESS:880,INFO:660,WARNING:440,ERROR:220,SYSTEM:550};
+
+let myId = null, myName = null, stomp = null;
+let notifs = [], activeFilter = 'ALL';
+
+// ── ENTER key support
+['inId','inName'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+});
+
+// ── LOGIN
+function login() {
+  const id = document.getElementById('inId').value.trim();
+  const nm = document.getElementById('inName').value.trim();
+  if (!id) { document.getElementById('lerr').style.display='block'; return; }
+  document.getElementById('lerr').style.display='none';
+  myId   = id;
+  myName = nm || ('مستخدم ' + id.slice(-4));
+  document.getElementById('lbtn').disabled = true;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('avEl').textContent   = myName[0];
+  document.getElementById('unameEl').textContent = myName;
+  document.getElementById('uidEl').textContent   = 'الهوية: ' + myId;
+  connect();
+}
+
+function logout() {
+  if (stomp) try { stomp.disconnect(); } catch(e) {}
+  myId = myName = stomp = null; notifs = [];
+  document.getElementById('lbtn').disabled = false;
+  document.getElementById('inId').value = '';
+  document.getElementById('inName').value = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ── WEBSOCKET
+function connect() {
+  setWS('wait');
+  const sock = new SockJS(WS_URL);
+  stomp = Stomp.over(sock);
+  stomp.debug = null;
+
+  // ← مهم: نرسل userId في login header حتى يعرفه الـ server
+  const headers = { login: myId, passcode: '' };
+
+  stomp.connect(headers, frame => {
+    setWS('on');
+    toast('✅', 'متصل — جاهز لاستقبال إشعاراتك', '#10b981');
+
+    // 1. إشعارات عامة (broadcast)
+    stomp.subscribe('/topic/notifications', msg => {
+      addNotif(JSON.parse(msg.body), true);
+    });
+
+    // 2. إشعارات خاصة بهويتي — المسار الذي يستخدمه convertAndSendToUser
+    stomp.subscribe('/topic/notifications/' + myId, msg => {
+      addNotif(JSON.parse(msg.body), true);
+    });
+
+    // 3. جلب التاريخ من Redis
+    fetch(API + '/api/notifications/user/' + myId)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) data.forEach(n => addNotif(n, false)); })
+      .catch(() => {});
+
+  }, err => {
+    setWS('off');
+    setTimeout(connect, 5000);
+  });
+}
+
+// ── ADD NOTIFICATION
+function addNotif(n, isNew) {
+  if (notifs.find(x => x.notificationId === n.notificationId)) return;
+  notifs.unshift(n);
+  updateStats();
+  render();
+  if (isNew) {
+    playSound(n.type);
+    const mine = n.userId === myId;
+    toast(ICON[n.type]||'🔔', n.title, mine ? '#7c3aed' : '#00d4ff');
+  }
+}
+
+// ── RENDER
+function render() {
+  const el = document.getElementById('nlist');
+  let list = activeFilter === 'MINE'  ? notifs.filter(n => n.userId === myId)
+           : activeFilter === 'ALL'   ? notifs
+           : notifs.filter(n => n.type === activeFilter);
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="eico">📭</div><p>لا توجد إشعارات</p></div>';
+    return;
+  }
+  el.innerHTML = list.map((n, i) => {
+    const mine = n.userId === myId;
+    return `<div class="nc t-${n.type}${i===0?' isnew':''}${mine?' ismine':''}">
+      <div class="nico ni-${n.type}">${ICON[n.type]||'🔔'}</div>
+      <div class="nbody">
+        <div class="nrow1">
+          <span class="ntit">${x(n.title)}</span>
+          <span class="pill pi-${n.type}">${LBL[n.type]||n.type}</span>
+          ${mine ? '<span class="pill pmine">👤 لك شخصياً</span>' : ''}
+        </div>
+        <div class="nmsg">${x(n.message)}</div>
+        <div class="nmeta">
+          <span class="ntime">🕐 ${ft(n.timestamp)}</span>
+          ${mine ? '<span class="nfor">هويتك ✓</span>' : ''}
+          ${n.userId && !mine ? `<span class="nfor">لـ: ${x(n.userId)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('stT').textContent = notifs.length;
+  document.getElementById('stS').textContent = notifs.filter(n=>n.type==='SUCCESS').length;
+  document.getElementById('stW').textContent = notifs.filter(n=>n.type==='WARNING').length;
+  document.getElementById('stE').textContent = notifs.filter(n=>n.type==='ERROR').length;
+}
+
+function setF(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  render();
+}
+
+function clearAll() { notifs = []; updateStats(); render(); }
+
+// ── SOUND — نغمة مختلفة لكل نوع
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type === 'ERROR' ? 'sawtooth' : 'sine';
+    osc.frequency.setValueAtTime(FREQ[type] || 660, ctx.currentTime);
+    osc.frequency.setValueAtTime((FREQ[type] || 660) * 1.25, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.55);
+  } catch(e) {}
+}
+
+// ── HELPERS
+function setWS(s) {
+  const b = document.getElementById('wsbadge');
+  const d = document.getElementById('wsdot');
+  const t = document.getElementById('wstext');
+  b.className = 'wsbadge ' + (s==='on'?'on':s==='off'?'off':'wait');
+  d.className = 'dot' + (s==='on' ? ' pulse' : '');
+  t.textContent = s==='on' ? '● متصل' : s==='off' ? '● منقطع' : 'جاري الاتصال...';
+}
+
+function toast(icon, msg, color) {
+  const c = document.createElement('div');
+  c.className = 'toast';
+  if (color) c.style.borderColor = color + '55';
+  c.innerHTML = `<span style="font-size:19px">${icon}</span><span>${x(msg)}</span>`;
+  document.getElementById('toasts').appendChild(c);
+  setTimeout(() => c.remove(), 4200);
+}
+
+function x(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function ft(ts) {
+  if (!ts) return 'الآن';
+  try {
+    return new Date(ts).toLocaleString('ar-SA', {
+      hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'2-digit'
+    });
+  } catch(e) { return String(ts); }
+}
+</script>
+</body>
+</html>

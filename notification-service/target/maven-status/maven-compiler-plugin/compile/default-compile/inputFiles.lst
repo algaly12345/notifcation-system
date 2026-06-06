@@ -1,0 +1,4 @@
+/Users/awadabayzeed/Downloads/notification-system/notification-service/src/main/java/com/notify/producer/model/NotificationRequest.java
+/Users/awadabayzeed/Downloads/notification-system/notification-service/src/main/java/com/notify/producer/NotificationServiceApplication.java
+/Users/awadabayzeed/Downloads/notification-system/notification-service/src/main/java/com/notify/producer/config/KafkaProducerConfig.java
+/Users/awadabayzeed/Downloads/notification-system/notification-service/src/main/java/com/notify/producer/controller/NotificationController.java
